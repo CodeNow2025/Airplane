@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Running Game</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        canvas {
+            border: 2px solid #fff;
+            background: linear-gradient(to bottom, #001, #003);
+            box-shadow: 0 0 20px rgba(0, 0, 255, 0.5);
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+            background-color: #00f;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 255, 0.5);
+        }
+        button:hover {
+            background-color: #0077ff;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="900" height="500"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Load airplane image
+        const airplaneImage = new Image();
+        airplaneImage.src = 'airplane.png'; // Replace with your airplane image URL
+
+        // Player properties
+        const playerWidth = 70; // Adjust based on your airplane image
+        const playerHeight = 30; // Adjust based on your airplane image
+        let playerX = 40;
+        let playerY = canvas.height / 2 - playerHeight / 2;
+        let playerSpeed = 300; // Pixels per second
+
+        // Game properties
+        let level = 1;
+        let gameSpeed = 1; // Base speed
+        let gameSpeedIncrement = 0.002; // Slower speed increase
+        let gameOver = false;
+        let gameStarted = false;
+        let startTime = Date.now();
+        let levelDuration = 120000; // 2 minutes for Level 1
+
+        // Obstacle properties
+        const obstacleWidth = 30;
+        const obstacleHeight = 30;
+        let obstacles = [];
+        let obstacleSpeed = 100; // Pixels per second
+
+        // Keyboard state
+        const keys = {
+            ArrowUp: false,
+            ArrowDown: false
+        };
+
+        // Event listeners for keydown and keyup
+        document.addEventListener('keydown', (e) => {
+            if (e.key in keys) {
+                keys[e.key] = true;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key in keys) {
+                keys[e.key] = false;
+            }
+        });
+
+        // Draw player (airplane)
+        function drawPlayer() {
+            if (airplaneImage.complete) {
+                ctx.drawImage(airplaneImage, playerX, playerY, playerWidth, playerHeight);
+            }
+        }
+
+        // Draw obstacles
+        function drawObstacles() {
+            ctx.fillStyle = '#f00';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#f00';
+            obstacles.forEach(obstacle => {
+                ctx.fillRect(obstacle.x, obstacle.y, obstacleWidth, obstacleHeight);
+            });
+            ctx.shadowBlur = 0; // Reset shadow
+        }
+
+        // Move player
+        function movePlayer(deltaTime) {
+            if (keys.ArrowUp && playerY > 0) {
+                playerY -= playerSpeed * (deltaTime / 1000);
+            }
+            if (keys.ArrowDown && playerY < canvas.height - playerHeight) {
+                playerY += playerSpeed * (deltaTime / 1000);
+            }
+        }
+
+        // Move obstacles
+        function moveObstacles(deltaTime) {
+            obstacles.forEach(obstacle => {
+                obstacle.x -= obstacleSpeed * gameSpeed * (deltaTime / 1000);
+            });
+
+            // Remove obstacles that are off-screen
+            obstacles = obstacles.filter(obstacle => obstacle.x + obstacleWidth > 0);
+
+            // Add new obstacles
+            if (Math.random() < 0.02) {
+                obstacles.push({
+                    x: canvas.width,
+                    y: Math.random() * (canvas.height - obstacleHeight)
+                });
+            }
+        }
+
+        // Check for collisions
+        function checkCollisions() {
+            obstacles.forEach(obstacle => {
+                if (playerX < obstacle.x + obstacleWidth &&
+                    playerX + playerWidth > obstacle.x &&
+                    playerY < obstacle.y + obstacleHeight &&
+                    playerY + playerHeight > obstacle.y) {
+                    gameOver = true;
+                }
+            });
+        }
+
+        // Update level and speed
+        function updateLevelAndSpeed() {
+            const currentTime = Date.now();
+            const elapsedTime = currentTime - startTime;
+
+            // Check if it's time to advance to the next level
+            if (elapsedTime >= levelDuration && level === 1) {
+                level++;
+                gameSpeedIncrement += 0.005; // Slightly increase speed increment
+                startTime = Date.now(); // Reset start time for the new level
+                showContinueButton();
+            }
+
+            // Gradually increase game speed
+            gameSpeed += gameSpeedIncrement;
+        }
+
+        // Draw HUD (level and speed)
+        function drawHUD() {
+            ctx.fillStyle = '#fff';
+            ctx.font = '20px Arial';
+            ctx.fillText(`Level: ${level}`, 50, 30);
+            ctx.fillText(`Speed: ${gameSpeed.toFixed(2)}`, 68, 60);
+        }
+
+        // Draw start screen
+        function drawStartScreen() {
+            ctx.fillStyle = '#fff';
+            ctx.font = '40px Times New Roman';
+            ctx.textAlign = 'center';
+            ctx.fillText('Click to Start', canvas.width / 2, canvas.height / 2);
+        }
+
+        // Draw game over screen
+        function drawGameOver() {
+            ctx.fillStyle = '#fff';
+            ctx.font = '40px Times New Roman';
+            ctx.textAlign = 'center';
+            ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2);
+            ctx.font = '20px Arial';
+            ctx.fillText('Click to Restart', canvas.width / 2, canvas.height / 2 + 50);
+        }
+
+        // Show continue button after Level 1
+        function showContinueButton() {
+            const button = document.createElement('button');
+            button.innerText = 'Continue to Level 2';
+            button.style.position = 'absolute';
+            button.style.top = '50%';
+            button.style.left = '50%';
+            button.style.transform = 'translate(-50%, -50%)';
+            button.onclick = () => {
+                level = 2;
+                gameSpeed = 1.5; // Increase speed for Level 2
+                document.body.removeChild(button);
+                startTime = Date.now(); // Reset start time for Level 2
+            };
+            document.body.appendChild(button);
+        }
+
+        // Clear canvas
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Reset game state
+        function resetGame() {
+            level = 1;
+            gameSpeed = 1;
+            gameOver = false;
+            playerY = canvas.height / 2 - playerHeight / 2;
+            obstacles = [];
+            startTime = Date.now();
+        }
+
+        // Game loop
+        let lastTime = 0;
+        function gameLoop(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            const deltaTime = timestamp - lastTime;
+            lastTime = timestamp;
+
+            if (!gameStarted) {
+                drawStartScreen();
+                return;
+            }
+
+            if (gameOver) {
+                drawGameOver();
+                return;
+            }
+
+            clearCanvas();
+            drawPlayer();
+            drawObstacles();
+            drawHUD();
+            movePlayer(deltaTime);
+            moveObstacles(deltaTime);
+            checkCollisions();
+            updateLevelAndSpeed();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start the game
+        canvas.addEventListener('click', () => {
+            if (!gameStarted || gameOver) {
+                resetGame();
+                gameStarted = true;
+                requestAnimationFrame(gameLoop);
+            }
+        });
+
+        // Initial start screen
+        drawStartScreen();
+    </script>
+</body>
+</html>
